@@ -1,0 +1,144 @@
+# -*- Mode: Shell-Script -*-
+#-----------------------------------------------------------------------------
+# Convenience wrapper utilitites for virtualenv.
+
+# Adapted from:
+# http://www.doughellmann.com/articles/CompletelyDifferent-2008-05-virtualenvwrapper/index.html
+
+# and ideas from Chris Burns' implementation of a similar tool (see
+# http://neuroimaging.scipy.org developer documentation).
+
+# Modifications: Fernando Perez <Fernando.Perez@berkeley.edu>
+#-----------------------------------------------------------------------------
+
+# PYTHONPATH: search path for python packages
+function mk_pythonpath {
+    # mk_pythonpath prefix python_major_version
+    local prefix=$1
+    local pyver_major=$2
+    
+    local pypath=python${pyver_major}/site-packages
+    echo $prefix/lib/$pypath
+}
+
+
+# Make sure there is a default value for WORKON_HOME.
+# You can override this setting in your .bashrc.
+if [ "$WORKON_HOME" = "" ]
+then
+    export WORKON_HOME="$HOME/.virtualenvs"
+fi
+
+# Verify that the WORKON_HOME directory exists
+function verify_workon_home () {
+    if [ ! -d "$WORKON_HOME" ]
+    then
+        echo "ERROR: $WORKON_HOME does not exist!"
+        return 1
+    fi
+    return 0
+}
+
+# Create a new environment, in the WORKON_HOME.
+#
+# Usage: mkvirtualenv [options] ENVNAME
+# (where the options are passed directly to virtualenv)
+#
+function mkvirtualenv () {
+    verify_workon_home
+    (cd "$WORKON_HOME"; virtualenv $*)
+    echo "Now you can use workon to activate your new virtualenv"
+}
+
+# Remove an environment, in the WORKON_HOME.
+function rmvirtualenv () {
+    typeset env_name="$1"
+    verify_workon_home
+    env_dir="$WORKON_HOME/$env_name"
+    if [ "$VIRTUAL_ENV" == "$env_dir" ]
+    then
+        echo "ERROR: You cannot remove the active environment."
+        return 1
+    fi
+    rm -rf "$env_dir"
+}
+
+# List the available environments.
+function show_workon_options () {
+    verify_workon_home
+	ls "$WORKON_HOME" | egrep -v '*.egg' | sort
+}
+
+# List or change working virtual environments.
+#
+# Usage: workon [environment_name]
+#
+# This process is done in two steps, this function prepares things and then
+# startts a new subshell which calls workon_start once it fires up.
+function workon () {
+    typeset env_name="$1"
+    if [ "$env_name" = "" ]
+    then
+        show_workon_options
+        return 1
+    fi
+
+    activate="$WORKON_HOME/$env_name/bin/activate"
+    if [ ! -f "$activate" ]
+    then
+        echo "ERROR: No activate for $WORKON_HOME/$env_name"
+        return 1
+    fi
+
+    if [ "$2" = "isolated" ]
+    then
+	echo "*** Generating postactivate script for isolated virtualenv ***"
+	echo 'export PYTHONPATH=$VIRTUAL_ENV_PYTHONPATH' > $WORKON_HOME/$env_name/bin/postactivate
+    fi
+
+    # We are going to transfer control to a new subshell, so that getting back
+    # to the previous envirionment is possible just by exiting the subshell.
+    
+    # This will be the virtualenv activate script for the new env, we nuke the
+    # old one (if there was one) and symlink in from the new environment
+    ACTIVATE_ENV=${WORKON_HOME}/activate
+    rm -f $ACTIVATE_ENV
+    ln -s $activate $ACTIVATE_ENV
+
+    # Now we can launch the new shell.  This one will then call workon_start
+    # that sources the actual virtualenv files within the new shell
+    echo "*** Starting new shell for virtualenv ***"
+    bash --rcfile $HOME/.bashrc_virtualenv
+}
+
+# Activate the new virtulalenv, this will be automatically called at the start
+# of a new virtualenv shell.  Calls pre/post hooks if present.
+function workon_start () {
+    # A convenient alias to quickly cd to the new virtual env
+    alias cdv="cd $VIRTUAL_ENV"
+
+    if [ -f "$VIRTUAL_ENV/bin/predeactivate" ]
+    then
+        source "$VIRTUAL_ENV/bin/predeactivate"
+    fi
+
+    # Actually load the virtualenv
+    source "${WORKON_HOME}/activate"
+
+    # Ensure that the pythonpath includes the virtualenv's python dirs
+
+    # Python version information
+    PYVER=$($VIRTUAL_ENV/bin/python -ESV 2>&1)
+    PYVER_MINOR=${PYVER#Python }
+    PYVER_MAJOR=${PYVER_MINOR:0:3}
+
+    export VIRTUAL_ENV_PYTHONPATH=$(mk_pythonpath $VIRTUAL_ENV $PYVER_MAJOR)
+    
+    export PYTHONPATH=$VIRTUAL_ENV_PYTHONPATH:$PYTHONPATH
+    
+    if [ -f "$VIRTUAL_ENV/bin/postactivate" ]
+    then
+        source "$VIRTUAL_ENV/bin/postactivate"
+    fi
+    return 0
+}

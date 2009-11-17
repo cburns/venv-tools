@@ -1,0 +1,11 @@
+# -*- Mode: Shell-Script -*- 
+# rc file to initialize bash environment for virtualenv sessions
+
+# first source the bash_profile
+source ~/.bash_profile
+
+# source the virtualenv config
+source ${WORKON_HOME}/activate
+
+# And actually start the virtualenv, including possible hooks
+workon_start
