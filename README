@@ -1,0 +1,37 @@
+This is a modified version of Doug Hellman's virtualenv wrappers.  His
+code has since changed quite a bit, but hopefully at some point we can
+push these changes upstream (or at least propose it).  But it wasn't
+immediately obvious how to fit my changes into the new code.  Fernando
+Perez also made many changes to the script, so it also wasn't clear
+where the original fork happened.
+
+http://www.doughellmann.com/articles/CompletelyDifferent-2008-05-virtualenvwrapper/index.html
+
+For the most part one follows the tutorial on Doug's blog post.
+Basically you defined a WORKON_HOME environment variable and source
+the utils script form your .bashrc:
+
+# virtualenv setup
+# Using Doug Hellman's virtualenvwrapper code.
+export WORKON_HOME="$HOME/local/virtualenv"
+source $HOME/.virtualenv_utils
+
+`mkvirtualenv` to make a virtual environment.
+`workon` to switch into a virtual env.
+
+The modifications to the standard virtualenvwrapper is that `workon`
+will launch a new bash shell, so you can simply type `exit` to exit
+the virtualenv.  I've also added a `isolated` flag to `workon` which
+will redefined the PYTHONPATH environment variable to only include the
+virtualenv environment.  In this way you can get a completely isolated
+environment:
+
+cburns@~ 16:41:05 $ echo $PYTHONPATH
+/home/cburns/local/virtualenv/myvenv/lib/python2.6/site-packages:.:/home/cburns/local/lib64/python2.6/site-packages/:/home/cburns/local/lib/python2.6/site-packages/:/usr/local/lib64/python2.6/site-packages/:/usr/local/lib/python2.6/site-packages/:/home/cburns/python2.6/Tools/scripts/:/home/cburns/src/epydoc-trunk/src/
+
+cburns@~ 16:41:46 $ workon myvenv isolated
+*** Generating postactivate script for isolated virtualenv ***
+*** Starting new shell for virtualenv ***
+(myvenv)cburns@~ 16:49:53 $ echo $PYTHONPATH
+/home/cburns/local/virtualenv/myvenv/lib/python2.6/site-packages
+
